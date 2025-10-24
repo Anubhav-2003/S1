@@ -50,5 +50,3 @@ S1_TOKENIZER.train_from_iterator(
 
 out = "s1-tokenizer-32k.json"
 S1_TOKENIZER.save(out)
-
-
