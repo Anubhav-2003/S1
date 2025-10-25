@@ -21,3 +21,16 @@ class RotaryPositionalEmbedding(nn.Module):
         baseFreq = 1.0 / (base ** dimTensor)
         
         return baseFreq
+    
+def computeOrtogonalPairs(X):
+    XFirst = X[..., :X.shape[-1] // 2]
+    XSecond = X[..., X.shape[-1] // 2 : ]
+    return torch.cat((-XSecond, XFirst), dim=-1)
+    
+def computePosEmbd(Q, K, cos, sin, unsqueezeDim = 1):
+    cos = cos.unsqueeze(unsqueezeDim)
+    sin = sin.unsqueeze(unsqueezeDim)
+    Q_rot = Q * cos + computeOrtogonalPairs(Q) * sin
+    K_rot = K * cos + computeOrtogonalPairs(K) * sin
+    return Q_rot, K_rot
+
