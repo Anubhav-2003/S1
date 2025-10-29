@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 class RotaryPositionalEmbedding(nn.Module):
-    def __init__(self, config: S1Config):
+    def __init__(self, config):
         super().__init__()
         
         base_freq = self.computeBaseFreq(config)
@@ -10,7 +10,7 @@ class RotaryPositionalEmbedding(nn.Module):
         self.register_buffer("base_freq", base_freq, persistent=False)
 
     @staticmethod
-    def computeBaseFreq(config: S1Config) -> torch.Tensor:
+    def computeBaseFreq(config) -> torch.Tensor:
         base = config.base
         dim = config.dim
         device = config.device
