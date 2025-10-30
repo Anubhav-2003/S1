@@ -38,12 +38,34 @@ class MultiHeadLatentAttention(nn.Module):
         q = q.view(batchSize, seqLen, self.nHeads, self.qkHeadRank)
         qNope, qPos = torch.split(q, [self.qkNopeRank, self.qkRopeRank], dim = -1)
         kvloraAndKRope = self.kvDandKRope(X)
-        kvloraAndKRope = kvloraAndKRope.view(batchSize, seqLen, self.nHeads, self.kvLoraRank + self.qkRopeRank)
         kvlora, kPos = torch.split(kvloraAndKRope, [self.kvLoraRank, self.qkRopeRank], dim = -1)
-        cos = torch.cos(self.rope.base_freq[:seqLen])
-        sin = torch.sin(self.rope.base_freq[:seqLen])
 
+        baseFreq = self.rope.base_freq
+        m = torch.arange(start, start + seqLen, device=X.device, dtype=torch.float32)
+        thetas = torch.outer(m, baseFreq)
+        cos = torch.cos(thetas).to(X.dtype)
+        sin = torch.sin(thetas).to(X.dtype)
+        cos = torch.cat((cos, cos), dim=-1)
+        sin = torch.cat((sin, sin), dim=-1)
+        kPos = kPos.unsqueeze(2)
         qRot, kRot = computePosEmbd(qPos, kPos, cos, sin)
-        
 
+        self.kvCache[:, start:endPos] = self.kvLoraNorm(kvlora)
+        self.PosEmb[:, start:endPos] = kRot.squeeze(2)
+        
+        scoreR = torch.einsum("bshd,bthd->bsht", qRot, self.PosEmb[:,:endPos])
+        wUKandwUV = self.kvUp.weight
+        wUKandwUV = wUKandwUV.view(self.nHeads, self.qkNopeRank + self.vHeadRank, self.kvLoraRank)
+        wUK = wUKandwUV[:, :self.qkNopeRank, :]
+        wUV = wUKandwUV[:, self.qkNopeRank: , :]
+        QAbs = torch.einsum("bshd, hsc -> bshc", qNope, wUK)
+        scoreC = torch.einsum("bshc, btc -> bsht", QAbs, self.kvCache[:, :endPos])
+        combScore = (scoreR + scoreC) * self.softmaxScale
+        attnWeights = torch.softmax(combScore, dim = -1).to(X.dtype)
+
+        outInter = torch.einsum("bsht, btc -> bshc", attnWeights, self.kvCache[:, :endPos])
+        outHead = torch.einsum("bshc, hdc, -> bshd", outInter, wUV)
+        output = outHead.view(batchSize, seqLen, -1)
+        output = self.wo(output)
+        return output
 
