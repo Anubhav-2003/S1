@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from rope import RotaryPositionalEmbedding, computePosEmbd
+from rms import RMS as RMSNorm
 
 class MultiHeadLatentAttention(nn.Module):
     def __init__(self, config):
