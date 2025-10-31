@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from rope import RotaryPositionalEmbedding, computePosEmbd
 from rms import RMS as RMSNorm
+from typing import Optional
 
 class MultiHeadLatentAttention(nn.Module):
     def __init__(self, config):
@@ -28,10 +29,8 @@ class MultiHeadLatentAttention(nn.Module):
 
         self.register_buffer("kvCache", torch.zeros(config.maxBatchSize, config.MaxContext, self.kvLoraRank), persistent=False)
         self.register_buffer("PosEmb", torch.zeros(config.maxBatchSize, config.MaxContext, self.qkRopeRank), persistent=False)
-
-        self.rope = RotaryPositionalEmbedding(config.ropeConfig)
         
-    def forward(self, X, start, freq):
+    def forward(self, X, start, cos, sin, mask: Optional[torch.tensor]):
         batchSize, seqLen, dim = X.size()
         endPos = start + seqLen
         
@@ -41,13 +40,6 @@ class MultiHeadLatentAttention(nn.Module):
         kvloraAndKRope = self.kvDandKRope(X)
         kvlora, kPos = torch.split(kvloraAndKRope, [self.kvLoraRank, self.qkRopeRank], dim = -1)
 
-        baseFreq = self.rope.base_freq
-        m = torch.arange(start, start + seqLen, device=X.device, dtype=torch.float32)
-        thetas = torch.outer(m, baseFreq)
-        cos = torch.cos(thetas).to(X.dtype)
-        sin = torch.sin(thetas).to(X.dtype)
-        cos = torch.cat((cos, cos), dim=-1)
-        sin = torch.cat((sin, sin), dim=-1)
         kPos = kPos.unsqueeze(2)
         qRot, kRot = computePosEmbd(qPos, kPos, cos, sin)
 
@@ -62,6 +54,8 @@ class MultiHeadLatentAttention(nn.Module):
         QAbs = torch.einsum("bshd, hsc -> bshc", qNope, wUK)
         scoreC = torch.einsum("bshc, btc -> bsht", QAbs, self.kvCache[:, :endPos])
         combScore = (scoreR + scoreC) * self.softmaxScale
+        if mask is not None:
+            combScore += mask.unsqueeze(1)
         attnWeights = torch.softmax(combScore, dim = -1).to(X.dtype)
 
         outInter = torch.einsum("bsht, btc -> bshc", attnWeights, self.kvCache[:, :endPos])
