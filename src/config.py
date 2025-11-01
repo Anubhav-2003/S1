@@ -2,7 +2,7 @@ import torch
 
 class MLACONFIG:
     dim = 768
-    nHeads = 16
+    nHeads = 6
     qLoraRank = 512
     kvLoraRank = 256
     qkNopeRank = 768
