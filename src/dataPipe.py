@@ -12,7 +12,15 @@ class DataPipe:
         return
     
     def _tokenize(self, examples):
-        encoded_batch = self.tokenizer.encode_batch(examples['text'])
+        valid_texts = [t for t in examples['text'] if t is not None and len(t.strip()) > 0]
+        
+        if not valid_texts:
+            return {
+                "input_ids": [],
+                "attention_mask": []
+            }
+            
+        encoded_batch = self.tokenizer.encode_batch(valid_texts)
         
         return {
             "input_ids": [encoding.ids for encoding in encoded_batch],
@@ -24,11 +32,18 @@ class DataPipe:
         
         stream = {}
         for k in keys_to_chunk:
-            valid_chunks = [chunk for chunk in tokenizedExamples[k] if chunk is not None]
+            valid_chunks = [chunk for chunk in tokenizedExamples[k] if chunk is not None and chunk]
             stream[k] = sum(valid_chunks, [])
         
-        totalLength = len(stream['input_ids'])
+        totalLength = len(stream.get('input_ids', []))
+
+        if totalLength == 0:
+            return {k: [] for k in keys_to_chunk}
+            
         totalLength = (totalLength // self.contextSize) * self.contextSize
+
+        if totalLength == 0:
+            return {k: [] for k in keys_to_chunk}
 
         chunkedExamples = {
             k: [t[i: i + self.contextSize] for i in range(0, totalLength, self.contextSize)]
@@ -45,20 +60,27 @@ class DataPipe:
             split='train',
             streaming=True)
 
-        C4 = C4Full.take(2500000) 
+        C4 = C4Full.take(2500000)
         rawDataset = interleave_datasets([books, C4])
 
         filteredDataset = rawDataset.filter(
             lambda example: example['text'] is not None and len(example['text'].strip()) > 0
         )
+
         tokenizdDataset = filteredDataset.map(
             self._tokenize,
             batched = True,
+            remove_columns = filteredDataset.column_names
         )
 
-        self.finalDataset = tokenizdDataset.map(
+        chunkedDataset = tokenizdDataset.map(
             self._createChunks,
-            batched = True
+            batched = True,
+            remove_columns = tokenizdDataset.column_names
+        )
+        
+        self.finalDataset = chunkedDataset.filter(
+            lambda example: example['input_ids'] is not None and len(example['input_ids']) > 0
         )
 
         self.finalDataset = self.finalDataset.with_format(type = 'torch')
@@ -71,6 +93,6 @@ class DataPipe:
             self.finalDataset,
             batch_size = self.batchSize,
             shuffle = False,
-            num_workers = self.numOfThreads,
+            num_workers = 0,
             pin_memory = True
         )

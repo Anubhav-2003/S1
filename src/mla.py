@@ -60,7 +60,7 @@ class MultiHeadLatentAttention(nn.Module):
 
         outInter = torch.einsum("bsht, btc -> bshc", attnWeights, self.kvCache[:, :endPos])
         outHead = torch.einsum("bshc, hdc -> bshd", outInter, wUV)
-        output = outHead.view(batchSize, seqLen, -1)
+        output = outHead.reshape(batchSize, seqLen, -1)
         output = self.wo(output)
         return output
 
