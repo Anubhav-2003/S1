@@ -43,8 +43,9 @@ class MultiHeadLatentAttention(nn.Module):
         kPos = kPos.unsqueeze(2)
         qRot, kRot = computePosEmbd(qPos, kPos, cos, sin)
 
-        self.kvCache[:, start:endPos] = self.kvLoraNorm(kvlora)
-        self.PosEmb[:, start:endPos] = kRot.squeeze(2)
+        with torch.no_grad():
+            self.kvCache[:, start:endPos] = self.kvLoraNorm(kvlora)
+            self.PosEmb[:, start:endPos] = kRot.squeeze(2)
         
         scoreR = torch.einsum("bshd,btd->bsht", qRot, self.PosEmb[:,:endPos])
         wUKandwUV = self.kvUp.weight
