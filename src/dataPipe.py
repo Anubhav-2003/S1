@@ -2,13 +2,14 @@ from datasets import load_dataset, interleave_datasets
 from torch.utils.data import DataLoader
 
 class DataPipe:
-    def __init__(self, tokenizer, batchSize, contextSize, numOfThreads, streaming):
+    def __init__(self, tokenizer, batchSize, contextSize, numOfThreads, streaming, save_path = None):
         self.tokenizer = tokenizer
         self.batchSize = batchSize
         self.contextSize = contextSize
         self.numOfThreads = numOfThreads
         self.streaming = streaming
         self.finalDataset = None
+        self.save_path = save_path
         return
     
     def _tokenize(self, examples):
@@ -54,6 +55,12 @@ class DataPipe:
     
 
     def setup(self):
+        if self.save_path and os.path.exists(self.save_path):
+            print(f"Loading pre-processed dataset from {self.save_path}...")
+            self.finalDataset = load_from_disk(self.save_path)
+            self.finalDataset = self.finalDataset.with_format(type='torch')
+            print("Dataset setup complete. Ready for DataLoader.")
+            return
         
         book_id = "rojagtap/bookcorpus"
         wiki_id = "wikimedia/wikipedia"
