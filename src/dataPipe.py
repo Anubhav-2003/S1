@@ -1,6 +1,6 @@
-from datasets import load_dataset, interleave_datasets
+from datasets import load_dataset, interleave_datasets, load_from_disk
 from torch.utils.data import DataLoader
-
+import os
 class DataPipe:
     def __init__(self, tokenizer, batchSize, contextSize, numOfThreads, streaming, save_path = None):
         self.tokenizer = tokenizer
