@@ -54,14 +54,26 @@ class DataPipe:
     
 
     def setup(self):
-        book_path = "/content/drive/MyDrive/huggingface_cache/datasets/rojagtap__bookcorpus" 
-        wiki_path = "/content/drive/MyDrive/huggingface_cache/datasets/wikimedia__wikipedia"
+        
+        book_id = "rojagtap/bookcorpus"
+        wiki_id = "wikimedia/wikipedia"
+        
+        wiki_config = "20231101.en" 
 
-        print(f"Loading datasets from {book_path} and {wiki_path} (non-streaming)...")
+        print(f"Loading datasets '{book_id}' and '{wiki_id}' (config: '{wiki_config}')...")
+        print("This will use your local cache in GDrive automatically.")
         
-        books = load_dataset(book_path, split = 'train')
-        wiki = load_dataset(wiki_path, split='train')
+        try:
+            books = load_dataset(book_id, split = 'train', streaming=self.streaming)
+            wiki = load_dataset(wiki_id, wiki_config, split='train', streaming=self.streaming)
         
+        except Exception as e:
+            print(f"--- ERROR ---")
+            print(f"Failed to load datasets. This could be because the config '{wiki_config}' for Wikipedia is wrong.")
+            print("Please check your cache folder '/content/drive/MyDrive/huggingface_cache/datasets/wikimedia__wikipedia' to see what the config subfolder is named (e.g., '20231101.en', 'en', etc.)")
+            print(f"Original error: {e}")
+            raise
+
         rawDataset = interleave_datasets([books, wiki])
         print("Datasets loaded and interleaved.")
 
