@@ -1,5 +1,13 @@
 import torch
 
+try:
+    import torch_xla.core.xla_model as xm
+    TPU_DEVICE = xm.xla_device()
+    print("Successfully found TPU device!")
+except ImportError:
+    TPU_DEVICE = None
+    print("torch_xla not found, TPU not available.")
+
 class MLACONFIG:
     dim = 768
     nHeads = 6
